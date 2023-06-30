@@ -275,6 +275,36 @@ void listarPedidosAprovados(Fila *fila)
     }
 }
 
+void listarPedidosCredito(Fila *filaPedidos)
+{
+    system("clear") || system("cls");
+    printf("--- Listar Pedidos de Crédito ---\n");
+
+    // Verificar se existem pedidos de crédito na fila
+    if (filaVazia(filaPedidos))
+    {
+        printf("Não existem pedidos de crédito.\n");
+        return;
+    }
+
+    // Percorrer a fila e exibir os detalhes de cada pedido de crédito
+    No *noAtual = filaPedidos->frente;
+
+    while (noAtual != NULL)
+    {
+        PedidoCredito pedido = noAtual->dados;
+
+        printf("ID do pedido: %d\n", pedido.id);
+        printf("Nome do cliente: %s\n", pedido.nome_cliente);
+        printf("Descrição: %s\n", pedido.descricao);
+        printf("Montante total: %.2f\n", pedido.montante_total);
+        printf("Estado de decisão: %s\n", pedido.estado_decisao);
+        printf("-------------------------------\n");
+
+        noAtual = noAtual->proximo;
+    }
+}
+
 void listarPedidosMontanteAcima(Fila *fila)
 {
     float valor;
@@ -485,6 +515,237 @@ void editarEstadoPedidoCredito(Fila *fila, UserDatabase *userDatabase)
     }
 }
 
+void editarDecisaoPedidoCredito(Fila *fila, UserDatabase *userDatabase)
+{
+    system("clear") || system("cls");
+    printf("--- Editar Decisão de Pedido de Crédito ---\n");
+
+    // Verificar se existem pedidos de crédito analisados
+    int temPedidosAnalisados = 0;
+    No *noAtual = fila->frente;
+
+    while (noAtual != NULL)
+    {
+        PedidoCredito pedido = noAtual->dados;
+
+        if (strcmp(pedido.estado_decisao, "analisado") == 0)
+        {
+            temPedidosAnalisados = 1;
+            break;
+        }
+
+        noAtual = noAtual->proximo;
+    }
+
+    if (!temPedidosAnalisados)
+    {
+        printf("Não existem pedidos de crédito analisados.\n");
+        return;
+    }
+
+    // Pedir o ID do pedido de crédito a editar
+    int idPedido;
+    printf("Digite o ID do pedido de crédito a editar: ");
+    scanf("%d", &idPedido);
+
+    // Procurar o pedido de crédito com o ID especificado
+    noAtual = fila->frente;
+    PedidoCredito *pedidoEditar = NULL;
+
+    while (noAtual != NULL)
+    {
+        PedidoCredito *pedido = &noAtual->dados;
+
+        if (pedido->id == idPedido && strcmp(pedido->estado_decisao, "analisado") == 0)
+        {
+            pedidoEditar = pedido;
+            break;
+        }
+
+        noAtual = noAtual->proximo;
+    }
+
+    if (pedidoEditar == NULL)
+    {
+        printf("Não foi encontrado um pedido de crédito com o ID especificado.\n");
+        return;
+    }
+
+    // Pedir a nova decisão e justificação
+    char novaDecisao[20];
+    printf("Digite a nova decisão (aprovado/rejeitado): ");
+    scanf("%s", novaDecisao);
+
+    char novaJustificacao[100];
+    printf("Digite a nova justificação: ");
+    scanf(" %[^\n]s", novaJustificacao);
+
+    // Atualizar os campos do pedido de crédito
+    strcpy(pedidoEditar->resultado_decisao, novaDecisao);
+    strcpy(pedidoEditar->justificacao_decisao, novaJustificacao);
+
+    // Obter o utilizador decisor atual
+    Utilizador *utilizadorDecisor = NULL;
+    Utilizador *users = userDatabase->users;
+    int numUsers = userDatabase->num_users;
+
+    for (int i = 0; i < numUsers; i++)
+    {
+        if (users[i].tipo == DECISOR)
+        {
+            utilizadorDecisor = &users[i];
+            break;
+        }
+    }
+
+    if (utilizadorDecisor == NULL)
+    {
+        printf("Erro: não foi encontrado um utilizador com o tipo DECISOR.\n");
+        return;
+    }
+
+    // Obter a data e hora atuais
+    time_t t = time(NULL);
+    struct tm *dataHora = localtime(&t);
+    strftime(pedidoEditar->data_decisao, sizeof(pedidoEditar->data_decisao), "%Y-%m-%d %H:%M:%S", dataHora);
+
+    // Atualizar o utilizador decisor do pedido de crédito
+    strcpy(pedidoEditar->utilizador_decisor, utilizadorDecisor->username);
+
+    printf("Decisão do pedido de crédito editada com sucesso.\n");
+}
+
+void removerPedidoCredito(Fila *filaPedidos)
+{
+    int id;
+    printf("Digite o ID do pedido de crédito que deseja remover: ");
+    scanf("%d", &id);
+
+    // Procurar o pedido de crédito na fila
+    No *noAtual = filaPedidos->frente;
+    No *noAnterior = NULL;
+
+    while (noAtual != NULL)
+    {
+        if (noAtual->dados.id == id)
+        {
+            // Remover o pedido de crédito encontrado
+            if (noAnterior == NULL)
+            {
+                // O pedido está no início da fila
+                filaPedidos->frente = noAtual->proximo;
+            }
+            else
+            {
+                // O pedido está no meio ou final da fila
+                noAnterior->proximo = noAtual->proximo;
+            }
+
+            // Liberar a memória do pedido removido
+            free(noAtual);
+
+            printf("Pedido de crédito removido com sucesso!\n");
+            return;
+        }
+
+        noAnterior = noAtual;
+        noAtual = noAtual->proximo;
+    }
+
+    printf("Pedido de crédito não encontrado!\n");
+}
+
+void procurarPedidoCreditoPorNome(Fila *filaPedidos)
+{
+    char nome[100];
+    printf("Digite o nome do cliente: ");
+    scanf("%s", nome);
+
+    // Procurar o pedido de crédito pelo nome
+    No *noAtual = filaPedidos->frente;
+    int encontrados = 0;
+
+    while (noAtual != NULL)
+    {
+        if (strcmp(noAtual->dados.nome_cliente, nome) == 0)
+        {
+            // Pedido encontrado com o nome correspondente
+            printf("ID do pedido: %d\n", noAtual->dados.id);
+            printf("Nome do cliente: %s\n", noAtual->dados.nome_cliente);
+            printf("Valor do crédito: %.2f\n", noAtual->dados.montante_total);
+            printf("-------------------------------\n");
+            encontrados++;
+        }
+
+        noAtual = noAtual->proximo;
+    }
+
+    if (encontrados == 0)
+    {
+        printf("Nenhum pedido de crédito encontrado para o nome fornecido.\n");
+    }
+}
+
+void criarNovoUtilizador(UserDatabase *userDatabase)
+{
+    system("clear") || system("cls");
+    printf("--- Criar Novo Utilizador ---\n");
+
+    // Verificar se a base de dados de utilizadores está cheia
+    if (userDatabase->num_users == MAX_USERS)
+    {
+        printf("Erro: A base de dados de utilizadores está cheia.\n");
+        return;
+    }
+
+    // Pedir os dados do novo utilizador
+    Utilizador novoUtilizador;
+
+    printf("Digite o username: ");
+    scanf("%s", novoUtilizador.username);
+
+    printf("Digite o nome: ");
+    scanf("%s", novoUtilizador.nome);
+
+    printf("Digite a password: ");
+    scanf("%s", novoUtilizador.password);
+
+    int tipoUtilizador;
+    printf("Digite o tipo de utilizador (0 - Administrador, 1 - Decisor): ");
+    scanf("%d", &tipoUtilizador);
+
+    if (tipoUtilizador == 0)
+    {
+        novoUtilizador.tipo = ADMINISTRADOR;
+    }
+    else if (tipoUtilizador == 1)
+    {
+        novoUtilizador.tipo = DECISOR;
+    }
+    else
+    {
+        printf("Erro: Tipo de utilizador inválido.\n");
+        return;
+    }
+
+    // Adicionar o novo utilizador à base de dados
+    userDatabase->users[userDatabase->num_users] = novoUtilizador;
+    userDatabase->num_users++;
+
+    // Salvar a base de dados de utilizadores no arquivo binário
+    FILE *file = fopen("users.bin", "wb");
+    if (file == NULL)
+    {
+        printf("Erro ao abrir o arquivo users.bin para escrita.\n");
+        return;
+    }
+
+    fwrite(userDatabase->users, sizeof(Utilizador), userDatabase->num_users, file);
+    fclose(file);
+
+    printf("Novo utilizador criado com sucesso e guardado em users.bin.\n");
+}
+
 void exibirMenuAdmin(Fila *filaPedidos, UserDatabase *userDatabase)
 {
     int opcao;
@@ -503,6 +764,7 @@ void exibirMenuAdmin(Fila *filaPedidos, UserDatabase *userDatabase)
         printf("9. Alterar decisão de um pedido de crédito\n");
         printf("10. Apagar um pedido de crédito\n");
         printf("11. Procurar um pedido de crédito pelo nome do cliente\n");
+        printf("12. Criar novo utilizador\n");
         printf("0. Sair\n");
         printf("Escolha uma opção: ");
         scanf("%d", &opcao);
@@ -542,12 +804,19 @@ void exibirMenuAdmin(Fila *filaPedidos, UserDatabase *userDatabase)
             break;
         case 9:
             // Implementar alteração de decisão de um pedido de crédito
+            editarDecisaoPedidoCredito(filaPedidos, userDatabase);
             break;
         case 10:
             // Implementar remoção de um pedido de crédito
+            removerPedidoCredito(filaPedidos);
             break;
         case 11:
             // Implementar procura de um pedido de crédito pelo nome do cliente
+            procurarPedidoCreditoPorNome(filaPedidos);
+            break;
+        case 12:
+            // Implementar criação de novo utilizador
+            criarNovoUtilizador(userDatabase);
             break;
         case 0:
             printf("Saindo do sistema...\n");
@@ -572,51 +841,125 @@ int verificarCredenciaisDecisor(char *username, char *password, UserDatabase *us
     return 0; // Credenciais inválidas ou usuário não é um decisor
 }
 
-void exibirMenuDecisor(Fila *filaPedidos)
+void analisarProximoPedidoCredito(Fila *filaPedidos, UserDatabase *userDatabase)
+{
+    system("clear") || system("cls");
+    printf("--- Análise do Próximo Pedido de Crédito ---\n");
+
+    // Verificar se existem pedidos de crédito para analisar
+    if (filaVazia(filaPedidos))
+    {
+        printf("Não existem pedidos de crédito para analisar.\n");
+        return;
+    }
+
+    // Obter o utilizador decisor atual
+    Utilizador *utilizadorDecisor = NULL;
+    Utilizador *users = userDatabase->users;
+    int numUsers = userDatabase->num_users;
+
+    for (int i = 0; i < numUsers; i++)
+    {
+        if (users[i].tipo == DECISOR)
+        {
+            utilizadorDecisor = &users[i];
+            break;
+        }
+    }
+
+    if (utilizadorDecisor == NULL)
+    {
+        printf("Erro: não foi encontrado um utilizador com o tipo DECISOR.\n");
+        return;
+    }
+
+    // Obter o próximo pedido de crédito da fila
+    PedidoCredito pedido = desenfileirar(filaPedidos);
+
+    // Atualizar os campos do pedido de crédito
+    strcpy(pedido.estado_decisao, "em análise");
+    strcpy(pedido.utilizador_decisor, utilizadorDecisor->username);
+
+    // Obter a data e hora atuais
+    time_t t = time(NULL);
+    struct tm *dataHora = localtime(&t);
+    strftime(pedido.data_decisao, sizeof(pedido.data_decisao), "%Y-%m-%d %H:%M:%S", dataHora);
+
+    // Exibir os detalhes do pedido de crédito
+    printf("ID do pedido: %d\n", pedido.id);
+    printf("Nome do cliente: %s\n", pedido.nome_cliente);
+    printf("Descrição: %s\n", pedido.descricao);
+    printf("Montante total: %.2f\n", pedido.montante_total);
+    printf("Fontes de rendimento:\n");
+    for (int i = 0; i < pedido.num_fontes_rendimento; i++)
+    {
+        printf("- %s\n", pedido.fontes_rendimento[i]);
+    }
+    printf("-------------------------------\n");
+
+    // Solicitar a decisão do decisor
+    char decisao[20];
+    printf("Digite a decisão (aprovado/rejeitado): ");
+    scanf("%s", decisao);
+
+    char justificacao[100];
+    printf("Digite a justificação: ");
+    scanf(" %[^\n]s", justificacao);
+
+    // Atualizar os campos do pedido de crédito com a decisão do decisor
+    strcpy(pedido.estado_decisao, "analisado");
+    strcpy(pedido.resultado_decisao, decisao);
+    strcpy(pedido.justificacao_decisao, justificacao);
+
+    printf("Decisão registrada com sucesso.\n");
+
+    // Enfileirar novamente o pedido de crédito após a análise
+    enfileirar(filaPedidos, pedido);
+}
+
+void exibirMenuDecisor(Fila *filaPedidos, UserDatabase *userDatabase)
 {
     int opcao;
 
     do
     {
-        printf("\n--- Menu Decisor ---\n");
-        printf("1. Listar pedidos de crédito por analisar\n");
-        printf("2. Listar pedidos de crédito analisados\n");
-        printf("3. Listar todos os pedidos de crédito analisados e aprovados\n");
-        printf("4. Listar todos os pedidos de crédito com montante acima de um valor\n");
-        printf("5. Listar todos os pedidos de crédito analisados por um determinado decisor\n");
-        printf("6. Gerar relatório com créditos analisados, ordenados por valor\n");
-        printf("0. Sair\n");
+        system("clear") || system("cls");
+        printf("--- Menu do Decisor ---\n");
+        printf("1. Analisar próximo pedido de crédito\n");
+        printf("2. Listar todos os pedidos de crédito\n");
+        printf("3. Procurar pedido de crédito por nome do cliente\n");
+        printf("4. Editar decisão de pedido de crédito\n");
+        printf("5. Sair\n");
         printf("Escolha uma opção: ");
         scanf("%d", &opcao);
 
         switch (opcao)
         {
         case 1:
-            listarPedidosPorAnalisar(filaPedidos);
+            analisarProximoPedidoCredito(filaPedidos, userDatabase);
             break;
         case 2:
-            listarPedidosAnalisados(filaPedidos);
+            listarPedidosCredito(filaPedidos);
             break;
         case 3:
-            // Implementar a análise de um pedido de crédito
+            procurarPedidoCreditoPorNome(filaPedidos);
             break;
         case 4:
-            // Implementar a análise de um pedido de crédito
+            editarDecisaoPedidoCredito(filaPedidos, userDatabase);
             break;
         case 5:
-            // Implementar a análise de um pedido de crédito
-            break;
-        case 6:
-            // Implementar a análise de um pedido de crédito
-            break;
-        case 0:
-            printf("Saindo do sistema...\n");
+            printf("Saindo do menu do Decisor...\n");
             break;
         default:
             printf("Opção inválida. Tente novamente.\n");
             break;
         }
-    } while (opcao != 0);
+
+        printf("Pressione Enter para continuar...");
+        getchar();
+        getchar();
+
+    } while (opcao != 5);
 }
 
 int main()
@@ -700,7 +1043,7 @@ int main()
             // Verificar as credenciais do decisor
             if (verificarCredenciaisDecisor(decisorUsername, decisorPassword, &userDB))
             {
-                exibirMenuDecisor(&filaPedidos);
+                exibirMenuDecisor(&filaPedidos, &userDB);
             }
             else
             {
